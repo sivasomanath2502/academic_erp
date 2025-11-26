@@ -1,0 +1,75 @@
+package com.academic.erp.backend.filter;
+
+import com.academic.erp.backend.dto.TokenInfoResponse;
+import com.academic.erp.backend.service.TokenService;
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+import java.util.Collections;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final TokenService tokenService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String idToken = extractIdTokenFromCookie(request);
+
+        if (idToken != null && !idToken.isEmpty()) {
+            try {
+                TokenInfoResponse tokenInfo = tokenService.validateIdToken(idToken);
+                
+                // Check if email starts with erphead
+                if (tokenInfo.getEmail() != null && 
+                    tokenInfo.getEmail().toLowerCase().startsWith("erphead")) {
+                    
+                    UsernamePasswordAuthenticationToken authentication = 
+                        new UsernamePasswordAuthenticationToken(
+                            tokenInfo.getEmail(),
+                            null,
+                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"))
+                        );
+                    
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else {
+                    log.warn("Access denied for email: {}", tokenInfo.getEmail());
+                    // Don't block here - let Spring Security handle authorization
+                }
+            } catch (Exception e) {
+                log.error("Token validation failed", e);
+                // Don't block here - let Spring Security handle authorization
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    private String extractIdTokenFromCookie(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie cookie : cookies) {
+                if ("id_token".equals(cookie.getName())) {
+                    return cookie.getValue();
+                }
+            }
+        }
+        return null;
+    }
+}
+

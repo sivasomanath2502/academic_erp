@@ -38,6 +38,11 @@ public class Student {
     @Column(nullable = false, unique = true, length = 255)
     private String email;
 
+    /**
+     * Path to the photograph file stored on the filesystem.
+     * The actual file is stored in the uploads/photos directory, not as a BLOB in the database.
+     * Example: "/uploads/photos/uuid-filename.jpg"
+     */
     @Column(name = "photograph_path", length = 512)
     private String photographPath;
 

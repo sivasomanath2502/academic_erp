@@ -5,29 +5,53 @@ import org.springframework.stereotype.Component;
 @Component
 public class RollNumberGenerator {
 
-    public String extractPrefix(String program) {
-        program = program.toUpperCase();
+    public String extractDegreePrefix(String program) {
+        String normalized = program.toUpperCase();
 
-        if (program.startsWith("M.TECH")) return "MT";
-        if (program.startsWith("IMTECH")) return "IMT";
-        if (program.startsWith("B.TECH")) return "BT";
-        if (program.startsWith("MS")) return "MS";
+        if (normalized.contains("IM.TECH") || normalized.startsWith("IMTECH")) {
+            return "IM";
+        }
+
+        if (normalized.contains("M.TECH")) {
+            return "MT";
+        }
+
+        if (normalized.contains("B.TECH")) {
+            return "BT";
+        }
+
+        if (normalized.startsWith("MS")) {
+            return "MS";
+        }
 
         throw new IllegalArgumentException("Invalid degree in program: " + program);
     }
 
-    public String extractDepartmentSeries(String program) {
-        program = program.toUpperCase();
+    public DepartmentRange resolveDepartmentRange(String program) {
+        String normalized = program.toUpperCase();
 
-        if (program.contains("CSE")) return "0";      // 001–150
-        if (program.contains("ECE")) return "5";      // 500–599
-        if (program.contains("AIDS")) return "7";     // 700–799
+        if (normalized.contains("CSE")) {
+            return new DepartmentRange(1, 200);
+        }
+        if (normalized.contains("ECE")) {
+            return new DepartmentRange(501, 600);
+        }
+        if (normalized.contains("AIDS")) {
+            return new DepartmentRange(701, 800);
+        }
 
-        throw new IllegalArgumentException("Invalid department in program: " + program);
+        throw new IllegalArgumentException("Unknown department in program: " + program);
     }
 
-    public String formatRollNumber(String prefix, Integer joinYear, Integer sequence, String deptSeries) {
+    public String buildRollBase(String prefix, Integer joinYear) {
+        return prefix + String.format("%04d", joinYear);
+    }
+
+    public String formatRollNumber(String prefix, Integer joinYear, Integer sequence) {
+        String rollBase = buildRollBase(prefix, joinYear);
         String seq = String.format("%03d", sequence);
-        return prefix + joinYear + deptSeries + seq;
+        return rollBase + seq;
     }
+
+    public record DepartmentRange(int startInclusive, int endInclusive) {}
 }

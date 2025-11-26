@@ -26,33 +26,36 @@ public class AdmissionServiceImpl implements AdmissionService {
         Domain domain = domainRepository.findById(request.getDomainId())
                 .orElseThrow(() -> new RuntimeException("Invalid domain ID"));
 
-        // 2) Validate duplicate email
-        studentRepository.findByEmail(request.getEmail())
-                .ifPresent(s -> {
-                    throw new RuntimeException("Email already exists");
-                });
+        // 2) Resolve degree prefix & department range
+        String prefix = rollNumberGenerator.extractDegreePrefix(domain.getProgram());
+        RollNumberGenerator.DepartmentRange range = rollNumberGenerator.resolveDepartmentRange(domain.getProgram());
 
-        // 3) Extract prefix + dept series
-        String prefix = rollNumberGenerator.extractPrefix(domain.getProgram());
-        String deptSeries = rollNumberGenerator.extractDepartmentSeries(domain.getProgram());
+        // 3) Fetch last sequence inside the department range for this join year
+        String rollBase = rollNumberGenerator.buildRollBase(prefix, request.getJoinYear());
 
-        // 4) Fetch last sequence for this domain + joinYear
-        Integer lastSeq = studentRepository
-                .findTopByDomain_ProgramAndJoinYearOrderBySeqNoDesc(domain.getProgram(), request.getJoinYear())
+        int lastSeq = studentRepository
+                .findTopByJoinYearAndSeqNoBetweenAndRollNumberStartingWithOrderBySeqNoDesc(
+                        request.getJoinYear(),
+                        range.startInclusive(),
+                        range.endInclusive(),
+                        rollBase
+                )
                 .map(Student::getSeqNo)
-                .orElse(0);
+                .orElse(range.startInclusive() - 1);
 
         int newSeq = lastSeq + 1;
+        if (newSeq > range.endInclusive()) {
+            throw new RuntimeException("Seat range exhausted for department: " + domain.getProgram());
+        }
 
-        // 5) Generate roll number
+        // 4) Generate roll number
         String rollNumber = rollNumberGenerator.formatRollNumber(
                 prefix,
                 request.getJoinYear(),
-                newSeq,
-                deptSeries
+                newSeq
         );
 
-        // 6) Build student entity
+        // 5) Build student entity
         Student student = Student.builder()
                 .firstName(request.getFirstName())
                 .lastName(request.getLastName())
@@ -64,10 +67,10 @@ public class AdmissionServiceImpl implements AdmissionService {
                 .rollNumber(rollNumber)
                 .build();
 
-        // 7) Save
+        // 6) Save
         studentRepository.save(student);
 
-        // 8) Return response
+        // 7) Return response
         return StudentResponseDto.builder()
                 .studentId(student.getStudentId())
                 .rollNumber(student.getRollNumber())

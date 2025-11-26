@@ -9,7 +9,10 @@ import java.util.Optional;
 @Repository
 public interface StudentRepository extends JpaRepository<Student, Long> {
 
-    Optional<Student> findByEmail(String email);
-
-    Optional<Student> findTopByDomain_ProgramAndJoinYearOrderBySeqNoDesc(String program, Integer joinYear);
+    Optional<Student> findTopByJoinYearAndSeqNoBetweenAndRollNumberStartingWithOrderBySeqNoDesc(
+            Integer joinYear,
+            Integer start,
+            Integer end,
+            String rollBase
+    );
 }
